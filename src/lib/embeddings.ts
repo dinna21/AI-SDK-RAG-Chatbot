@@ -1,5 +1,6 @@
 import { type OpenAIEmbeddingModelOptions, openai } from "@ai-sdk/openai";
 import { embed, embedMany } from "ai";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSIONS = 1536;
@@ -24,10 +25,10 @@ export function normalizeTextForEmbedding(text: string) {
   return text.replace(/\s+/g, " ").trim();
 }
 
-export function chunkText(
+export async function chunkText(
   text: string,
   { chunkSize = 1200, overlap = 200 } = {},
-): TextChunk[] {
+): Promise<TextChunk[]> {
   if (chunkSize <= 0) {
     throw new Error("chunkSize must be greater than 0.");
   }
@@ -44,30 +45,18 @@ export function chunkText(
     return [];
   }
 
-  const chunks: TextChunk[] = [];
-  let start = 0;
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize,
+    chunkOverlap: overlap,
+    separators: ["\n\n", "\n", ". ", "? ", "! ", " ", ""],
+  });
 
-  while (start < normalizedText.length) {
-    const rawEnd = Math.min(start + chunkSize, normalizedText.length);
-    const nextBoundary = findChunkBoundary(normalizedText, start, rawEnd);
-    const end = nextBoundary > start ? nextBoundary : rawEnd;
-    const content = normalizedText.slice(start, end).trim();
+  const chunks = await splitter.splitText(normalizedText);
 
-    if (content) {
-      chunks.push({
-        content,
-        chunkIndex: chunks.length,
-      });
-    }
-
-    if (end >= normalizedText.length) {
-      break;
-    }
-
-    start = Math.max(end - overlap, 0);
-  }
-
-  return chunks;
+  return chunks.map((content, index) => ({
+    content: content.trim(),
+    chunkIndex: index,
+  }));
 }
 
 export async function generateEmbedding(
@@ -125,7 +114,7 @@ export async function generateEmbeddingsForText(
     overlap?: number;
   } = {},
 ) {
-  const chunks = chunkText(text, {
+  const chunks = await chunkText(text, {
     chunkSize: options.chunkSize,
     overlap: options.overlap,
   });
@@ -147,23 +136,4 @@ function getOpenAIEmbeddingOptions(user?: string) {
       user,
     } satisfies OpenAIEmbeddingModelOptions,
   };
-}
-
-function findChunkBoundary(text: string, start: number, end: number) {
-  if (end >= text.length) {
-    return end;
-  }
-
-  const boundarySearchStart = Math.max(start, end - 200);
-  const boundaryChars = [". ", "? ", "! ", "\n", " "];
-
-  for (const boundaryChar of boundaryChars) {
-    const boundaryIndex = text.lastIndexOf(boundaryChar, end);
-
-    if (boundaryIndex >= boundarySearchStart) {
-      return boundaryIndex + boundaryChar.length;
-    }
-  }
-
-  return end;
 }
