@@ -1,6 +1,10 @@
 import { type OpenAIEmbeddingModelOptions, openai } from "@ai-sdk/openai";
 import { embed, embedMany } from "ai";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import {
+  chunkText,
+  normalizeTextForEmbedding,
+  type TextChunk,
+} from "@/lib/chunking";
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSIONS = 1536;
@@ -12,52 +16,9 @@ type EmbeddingOptions = {
   user?: string;
 };
 
-export type TextChunk = {
-  content: string;
-  chunkIndex: number;
-};
-
 export type EmbeddedTextChunk = TextChunk & {
   embedding: number[];
 };
-
-export function normalizeTextForEmbedding(text: string) {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-export async function chunkText(
-  text: string,
-  { chunkSize = 1200, overlap = 200 } = {},
-): Promise<TextChunk[]> {
-  if (chunkSize <= 0) {
-    throw new Error("chunkSize must be greater than 0.");
-  }
-
-  if (overlap < 0 || overlap >= chunkSize) {
-    throw new Error(
-      "overlap must be greater than or equal to 0 and less than chunkSize.",
-    );
-  }
-
-  const normalizedText = normalizeTextForEmbedding(text);
-
-  if (!normalizedText) {
-    return [];
-  }
-
-  const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize,
-    chunkOverlap: overlap,
-    separators: ["\n\n", "\n", ". ", "? ", "! ", " ", ""],
-  });
-
-  const chunks = await splitter.splitText(normalizedText);
-
-  return chunks.map((content, index) => ({
-    content: content.trim(),
-    chunkIndex: index,
-  }));
-}
 
 export async function generateEmbedding(
   value: string,
