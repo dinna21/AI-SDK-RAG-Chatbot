@@ -2,10 +2,9 @@
 
 import { eq } from "drizzle-orm";
 import { PDFParse } from "pdf-parse";
-
+import { chunkText } from "@/lib/chunking";
 import { db } from "@/lib/db-config";
 import { documents } from "@/lib/db-schema";
-import { chunkText } from "@/lib/chunking";
 import { generateEmbeddingsForChunks } from "@/lib/embeddings";
 
 export async function uploadDocument(formData: FormData) {
@@ -18,15 +17,17 @@ export async function uploadDocument(formData: FormData) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const parser = new PDFParse({
-      data: buffer,
-    });
+    const parser = new PDFParse({ data: buffer });
+    let text = "";
 
-    const parsedDocument = await parser.getText();
+    try {
+      const parsedDocument = await parser.getText();
+      text = parsedDocument.text;
+    } finally {
+      await parser.destroy();
+    }
 
-    await parser.destroy();
-
-    const chunks = await chunkText(parsedDocument.text);
+    const chunks = await chunkText(text);
 
     if (chunks.length === 0) {
       return { inserted: 0 };
@@ -53,7 +54,7 @@ export async function uploadDocument(formData: FormData) {
           size: file.size,
         },
         embedding: chunk.embedding,
-      }))
+      })),
     );
 
     return {
