@@ -10,6 +10,8 @@ import {
   vector,
 } from "drizzle-orm/pg-core";
 
+export const DOCUMENT_EMBEDDING_DIMENSIONS = 768;
+
 export const documents = pgTable(
   "documents",
   {
@@ -19,7 +21,9 @@ export const documents = pgTable(
     content: text("content").notNull(),
     chunkIndex: integer("chunk_index").notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
-    embedding: vector("embedding", { dimensions: 1536 }).notNull(),
+    embedding: vector("embedding", {
+      dimensions: DOCUMENT_EMBEDDING_DIMENSIONS,
+    }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
