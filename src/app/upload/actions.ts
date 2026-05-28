@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { PDFParse } from "pdf-parse";
 import { chunkText } from "@/lib/chunking";
 import { db } from "@/lib/db-config";
@@ -53,7 +53,7 @@ export async function uploadDocument(formData: FormData) {
           fileType: file.type,
           size: file.size,
         },
-        embedding: chunk.embedding,
+        embedding: sql`${formatPgVector(chunk.embedding)}::vector`,
       })),
     );
 
@@ -70,4 +70,8 @@ export async function uploadDocument(formData: FormData) {
 
     throw error;
   }
+}
+
+function formatPgVector(embedding: number[]) {
+  return `[${embedding.join(",")}]`;
 }

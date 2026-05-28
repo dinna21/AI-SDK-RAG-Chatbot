@@ -1,10 +1,5 @@
-import {
-  streamText,
-  UIMessage,
-  convertToModelMessages,
-} from "ai";
-
-import { openai } from "@ai-sdk/openai";
+import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import { OLLAMA_CHAT_MODEL, ollama } from "@/lib/ollama";
 
 function getChatErrorMessage(error: unknown) {
   if (typeof error !== "object" || error === null) {
@@ -18,28 +13,22 @@ function getChatErrorMessage(error: unknown) {
     message?: string;
   };
 
-  const errorType = providerError.error?.type ?? providerError.type;
-  const errorCode = providerError.error?.code ?? providerError.code;
-  const errorMessage = providerError.error?.message ?? providerError.message ?? "";
+  const errorMessage =
+    providerError.error?.message ?? providerError.message ?? "";
 
-  if (
-    errorType === "insufficient_quota" ||
-    errorCode === "insufficient_quota" ||
-    errorMessage.toLowerCase().includes("insufficient_quota")
-  ) {
-    return "OpenAI quota has been exceeded. Check your plan and billing settings before trying again.";
+  if (errorMessage.toLowerCase().includes("connection refused")) {
+    return "Ollama is not running. Start Ollama locally and try again.";
   }
 
-  return "The chat service could not complete the request.";
+  return "The local Ollama chat service could not complete the request.";
 }
 
 export async function POST(request: Request) {
   try {
-    const { messages }: { messages: UIMessage[] } =
-      await request.json();
+    const { messages }: { messages: UIMessage[] } = await request.json();
 
     const result = streamText({
-      model: openai("gpt-4o-mini"),
+      model: ollama.chat(OLLAMA_CHAT_MODEL),
       messages: await convertToModelMessages(messages),
     });
 
