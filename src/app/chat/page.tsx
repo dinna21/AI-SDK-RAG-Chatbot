@@ -4,18 +4,18 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import {
   ArrowUp,
-  Bot,
   BookOpen,
-  Copy,
+  Bot,
   Check,
+  Copy,
+  FileSearch,
+  Lightbulb,
   Loader2,
   RefreshCw,
   Sparkles,
   User,
-  FileSearch,
-  Lightbulb,
 } from "lucide-react";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const suggestions = [
   {
@@ -46,6 +46,7 @@ function CopyButton({ text }: { text: string }) {
 
   return (
     <button
+      type="button"
       onClick={handleCopy}
       className="opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 rounded-md hover:bg-white/10 text-zinc-500 hover:text-zinc-300"
       aria-label="Copy message"
@@ -78,13 +79,18 @@ function TypingIndicator() {
 // Simple markdown-like renderer for bold, inline code, and line breaks
 function MessageContent({ text }: { text: string }) {
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+  let cursor = 0;
+
   return (
     <span>
-      {parts.map((part, i) => {
+      {parts.map((part) => {
+        const partStart = cursor;
+        cursor += part.length;
+
         if (part.startsWith("`") && part.endsWith("`")) {
           return (
             <code
-              key={i}
+              key={`${partStart}-code`}
               className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-emerald-300"
             >
               {part.slice(1, -1)}
@@ -93,19 +99,27 @@ function MessageContent({ text }: { text: string }) {
         }
         if (part.startsWith("**") && part.endsWith("**")) {
           return (
-            <strong key={i} className="font-semibold text-white">
+            <strong key={`${partStart}-strong`} className="font-semibold text-white">
               {part.slice(2, -2)}
             </strong>
           );
         }
+
+        let lineCursor = partStart;
+
         return (
-          <span key={i}>
-            {part.split("\n").map((line, j, arr) => (
-              <span key={j}>
-                {line}
-                {j < arr.length - 1 && <br />}
-              </span>
-            ))}
+          <span key={`${partStart}-text`}>
+            {part.split("\n").map((line, lineIndex, arr) => {
+              const lineStart = lineCursor;
+              lineCursor += line.length + 1;
+
+              return (
+                <span key={`${lineStart}-line`}>
+                  {line}
+                  {lineIndex < arr.length - 1 && <br />}
+                </span>
+              );
+            })}
           </span>
         );
       })}
@@ -121,7 +135,7 @@ export default function ChatPage() {
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
-  const { messages, sendMessage, status, error, reload } = useChat({
+  const { messages, sendMessage, status, error, regenerate } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
     }),
@@ -135,7 +149,7 @@ export default function ChatPage() {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, []);
 
   // Scroll to bottom helper
@@ -155,6 +169,9 @@ export default function ChatPage() {
 
   // Auto-scroll: only when user hasn't scrolled up manually
   useEffect(() => {
+    void messages;
+    void isLoading;
+
     if (!isUserScrolledUp) {
       scrollToBottom("smooth");
     }
@@ -352,7 +369,8 @@ export default function ChatPage() {
                   <p>{error.message || "Something went wrong. Please try again."}</p>
                 </div>
                 <button
-                  onClick={() => reload()}
+                  type="button"
+                  onClick={() => regenerate()}
                   className="shrink-0 flex items-center gap-1.5 rounded-lg border border-red-400/20 bg-red-400/10 px-2.5 py-1.5 text-xs font-medium text-red-300 transition hover:bg-red-400/20"
                 >
                   <RefreshCw className="h-3 w-3" />
@@ -369,6 +387,7 @@ export default function ChatPage() {
         {showScrollButton && (
           <div className="pointer-events-none absolute bottom-24 left-0 right-0 flex justify-center">
             <button
+              type="button"
               onClick={() => {
                 setIsUserScrolledUp(false);
                 scrollToBottom("smooth");
